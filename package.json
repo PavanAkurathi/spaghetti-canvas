@@ -7,12 +7,12 @@
   "icon": "icon.png",
   "repository": {
     "type": "git",
-    "url": "https://github.com/spaghetti-team/spaghetti-canvas"
+    "url": "https://github.com/PavanAkurathi/spaghetti-canvas"
   },
   "bugs": {
-    "url": "https://github.com/spaghetti-team/spaghetti-canvas/issues"
+    "url": "https://github.com/PavanAkurathi/spaghetti-canvas/issues"
   },
-  "homepage": "https://github.com/spaghetti-team/spaghetti-canvas#readme",
+  "homepage": "https://github.com/PavanAkurathi/spaghetti-canvas#readme",
   "keywords": [
     "codebase",
     "visualization",
