@@ -67,7 +67,7 @@
         "spaghetti.allowedExtensions": {
           "type": "array",
           "items": { "type": "string" },
-          "default": [".ts", ".js", ".svelte", ".json", ".html", ".css", ".rs", ".py", ".md"],
+          "default": [".ts", ".tsx", ".js", ".jsx", ".svelte", ".json", ".html", ".css", ".rs", ".py", ".md", ".c", ".h", ".cpp", ".hpp", ".java"],
           "description": "File extensions to include in the dependency graph."
         },
         "spaghetti.maxPreviewLines": {

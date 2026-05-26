@@ -27,7 +27,13 @@ const DEFAULT_IGNORE_DIRS = [
   '.vercel', '.turbo', '.next', '.nuxt', 'coverage', '.nyc_output',
   'worktrees', '__pycache__', '.pytest_cache', 'vendor',
 ];
-const DEFAULT_EXTENSIONS = ['.ts', '.js', '.svelte', '.json', '.html', '.css', '.rs', '.py', '.md'];
+const DEFAULT_EXTENSIONS = [
+  '.ts', '.tsx', '.js', '.jsx', '.svelte',
+  '.json', '.html', '.css',
+  '.rs', '.py', '.md',
+  '.c', '.h', '.cpp', '.hpp',
+  '.java',
+];
 
 function getConfig() {
   const cfg = vscode.workspace.getConfiguration('spaghetti');
@@ -68,80 +74,117 @@ function scanDirectory(dirPath: string, rootDir: string, filesList: string[] = [
   return filesList;
 }
 
-// Regex patterns to capture import statements
 const JS_TS_IMPORT_REGEX = /(?:import|export)\s+(?:[\w*\s{},]*\s+from\s+)?['"]([^'"]+)['"]/g;
 const REQUIRE_REGEX = /require\(['"]([^'"]+)['"]\)/g;
+const RUST_IMPORT_REGEX = /use\s+crate::([a-zA-Z0-9_:]+)/g;
+const C_INCLUDE_REGEX = /#include\s+"([^"]+)"/g;
+const JAVA_IMPORT_REGEX = /^import\s+(?:static\s+)?([a-zA-Z_$][\w$]*(?:\.[\w$]+)+)(?:\.\*)?;/gm;
 
 function extractImports(filePath: string, content: string): string[] {
   const imports: string[] = [];
   const ext = path.extname(filePath).toLowerCase();
 
-  // JavaScript, TypeScript, Svelte imports
-  if (['.js', '.ts', '.svelte'].includes(ext)) {
+  if (['.js', '.ts', '.tsx', '.jsx', '.svelte'].includes(ext)) {
     let match;
     JS_TS_IMPORT_REGEX.lastIndex = 0;
     REQUIRE_REGEX.lastIndex = 0;
-
-    while ((match = JS_TS_IMPORT_REGEX.exec(content)) !== null) {
-      imports.push(match[1]);
-    }
-    while ((match = REQUIRE_REGEX.exec(content)) !== null) {
-      imports.push(match[1]);
-    }
+    while ((match = JS_TS_IMPORT_REGEX.exec(content)) !== null) imports.push(match[1]);
+    while ((match = REQUIRE_REGEX.exec(content)) !== null) imports.push(match[1]);
   } else if (ext === '.rs') {
-    // Rust crate level imports
-    const RUST_IMPORT_REGEX = /use\s+crate::([a-zA-Z0-9_:]+)/g;
     let match;
-    while ((match = RUST_IMPORT_REGEX.exec(content)) !== null) {
-      imports.push(`crate::${match[1]}`);
+    RUST_IMPORT_REGEX.lastIndex = 0;
+    while ((match = RUST_IMPORT_REGEX.exec(content)) !== null) imports.push(`crate::${match[1]}`);
+  } else if (['.c', '.h', '.cpp', '.hpp'].includes(ext)) {
+    C_INCLUDE_REGEX.lastIndex = 0;
+    let match;
+    while ((match = C_INCLUDE_REGEX.exec(content)) !== null) {
+      const inc = match[1];
+      imports.push(inc.startsWith('.') ? inc : `./${inc}`);
     }
+  } else if (ext === '.java') {
+    JAVA_IMPORT_REGEX.lastIndex = 0;
+    let match;
+    while ((match = JAVA_IMPORT_REGEX.exec(content)) !== null) imports.push(`java:${match[1]}`);
   }
 
   return imports;
 }
 
-// Resolve imported paths to actual files in the codebase
-function resolveImportPath(
-  importerRelativePath: string, 
-  importString: string, 
-  allFiles: Set<string>
-): string | null {
-  // If it's a Rust crate import
-  if (importString.startsWith('crate::')) {
-    const cleanPath = importString.substring(7);
-    const parts = cleanPath.split('::');
-
-    for (let i = 1; i <= parts.length; i++) {
-      const subparts = parts.slice(0, i);
-      const possiblePaths = [
-        path.join('src', ...subparts) + '.rs',
-        path.join('src', ...subparts, 'mod.rs')
-      ];
-
-      for (const p of possiblePaths) {
-        if (allFiles.has(p)) {
-          return p;
-        }
-      }
+function readAliases(rootDir: string): Record<string, string[]> {
+  const aliases: Record<string, string[]> = { '@/*': ['src/*'] };
+  try {
+    const tsconfigPath = path.join(rootDir, 'tsconfig.json');
+    if (fs.existsSync(tsconfigPath)) {
+      const raw = fs.readFileSync(tsconfigPath, 'utf-8');
+      const cleaned = raw.replace(/\/\/[^\n]*/g, '').replace(/\/\*[\s\S]*?\*\//g, '');
+      const tsconfig = JSON.parse(cleaned);
+      const tsPaths = tsconfig?.compilerOptions?.paths;
+      if (tsPaths && typeof tsPaths === 'object') Object.assign(aliases, tsPaths);
     }
+  } catch { /* fall back to defaults */ }
+  return aliases;
+}
+
+const RESOLVE_EXTENSIONS = ['.ts', '.tsx', '.js', '.jsx', '.svelte', '.json'];
+
+function resolveImportPath(
+  importerRelativePath: string,
+  importString: string,
+  allFiles: Set<string>,
+  aliases: Record<string, string[]> = {}
+): string | null {
+  // Java: convert dotted package name to file path
+  if (importString.startsWith('java:')) {
+    const packagePath = importString.slice(5).replace(/\./g, '/') + '.java';
+    for (const srcRoot of ['src/main/java', 'src', '']) {
+      const candidate = srcRoot ? path.join(srcRoot, packagePath) : packagePath;
+      if (allFiles.has(candidate)) return candidate;
+    }
+    return null;
   }
 
-  // If it's a relative import (starts with . or ..)
-  if (importString.startsWith('.')) {
-    const importerDir = path.dirname(importerRelativePath);
-    const resolvedPath = path.join(importerDir, importString);
-
-    if (allFiles.has(resolvedPath)) return resolvedPath;
-
-    const possibleExtensions = ['.ts', '.js', '.svelte', '.json'];
-    for (const ext of possibleExtensions) {
-      const pathWithExt = resolvedPath + ext;
-      if (allFiles.has(pathWithExt)) return pathWithExt;
+  // Rust crate-relative import
+  if (importString.startsWith('crate::')) {
+    const parts = importString.substring(7).split('::');
+    for (let i = 1; i <= parts.length; i++) {
+      const sub = parts.slice(0, i);
+      for (const p of [path.join('src', ...sub) + '.rs', path.join('src', ...sub, 'mod.rs')]) {
+        if (allFiles.has(p)) return p;
+      }
     }
+    return null;
+  }
 
-    for (const ext of possibleExtensions) {
-      const indexPathWithExt = path.join(resolvedPath, `index${ext}`);
-      if (allFiles.has(indexPathWithExt)) return indexPathWithExt;
+  // Relative import (also handles C local includes normalised to ./)
+  if (importString.startsWith('.')) {
+    const resolved = path.join(path.dirname(importerRelativePath), importString);
+    if (allFiles.has(resolved)) return resolved;
+    for (const ext of RESOLVE_EXTENSIONS) {
+      if (allFiles.has(resolved + ext)) return resolved + ext;
+    }
+    for (const ext of RESOLVE_EXTENSIONS) {
+      const idx = path.join(resolved, `index${ext}`);
+      if (allFiles.has(idx)) return idx;
+    }
+    return null;
+  }
+
+  // Alias resolution: tsconfig paths, @/, ~/, etc.
+  for (const [aliasPattern, targets] of Object.entries(aliases)) {
+    const prefix = aliasPattern.endsWith('/*') ? aliasPattern.slice(0, -1) : aliasPattern;
+    if (!importString.startsWith(prefix)) continue;
+    const rest = importString.slice(prefix.length);
+    for (const target of targets) {
+      const targetBase = target.endsWith('/*') ? target.slice(0, -1) : target;
+      const candidate = path.join(targetBase, rest);
+      if (allFiles.has(candidate)) return candidate;
+      for (const ext of RESOLVE_EXTENSIONS) {
+        if (allFiles.has(candidate + ext)) return candidate + ext;
+      }
+      for (const ext of RESOLVE_EXTENSIONS) {
+        const idx = path.join(candidate, `index${ext}`);
+        if (allFiles.has(idx)) return idx;
+      }
     }
   }
 
@@ -151,6 +194,7 @@ function resolveImportPath(
 function generateGraph(rootDir: string): CodebaseGraph {
   const relativeFilePaths = scanDirectory(rootDir, rootDir);
   const allFilesSet = new Set(relativeFilePaths);
+  const aliases = readAliases(rootDir);
 
   const nodes: CodeNode[] = [];
   const links: CodeLink[] = [];
@@ -160,7 +204,6 @@ function generateGraph(rootDir: string): CodebaseGraph {
     try {
       const stat = fs.statSync(fullPath);
       const content = fs.readFileSync(fullPath, 'utf-8');
-
       const preview = content.split('\n').slice(0, 20).map(l => l.slice(0, 80));
 
       nodes.push({
@@ -174,13 +217,8 @@ function generateGraph(rootDir: string): CodebaseGraph {
 
       const rawImports = extractImports(relPath, content);
       for (const rawImport of rawImports) {
-        const resolved = resolveImportPath(relPath, rawImport, allFilesSet);
-        if (resolved) {
-          links.push({
-            source: relPath,
-            target: resolved,
-          });
-        }
+        const resolved = resolveImportPath(relPath, rawImport, allFilesSet, aliases);
+        if (resolved) links.push({ source: relPath, target: resolved });
       }
     } catch (e) {
       console.error(`Error reading ${relPath}:`, e);

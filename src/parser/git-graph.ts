@@ -83,8 +83,6 @@ function generateGitGraph(repoDir: string): GitGraph {
       };
     });
 
-  const byName = Object.fromEntries(rawBranches.map(b => [b.name, b]));
-
   const branches: BranchNode[] = rawBranches.map(branch => {
     // Find parent: the branch whose tip is a direct ancestor of this branch,
     // is older, and has the latest timestamp among all such candidates.
