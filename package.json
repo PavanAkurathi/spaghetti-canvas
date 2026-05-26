@@ -1,9 +1,32 @@
 {
-  "name": "spaghetti",
-  "displayName": "Spaghetti Codebase Visualizer",
-  "description": "Visualizes local directory structure and imports on an interactive canvas.",
+  "name": "spaghetti-canvas",
+  "displayName": "Spaghetti Canvas",
+  "description": "Interactive infinite canvas that visualizes your codebase as a dependency graph and git branches as a connected timeline — with syntax-highlighted file previews.",
   "publisher": "spaghetti-team",
   "version": "0.1.0",
+  "icon": "icon.png",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/spaghetti-team/spaghetti-canvas"
+  },
+  "bugs": {
+    "url": "https://github.com/spaghetti-team/spaghetti-canvas/issues"
+  },
+  "homepage": "https://github.com/spaghetti-team/spaghetti-canvas#readme",
+  "keywords": [
+    "codebase",
+    "visualization",
+    "dependency graph",
+    "git",
+    "canvas",
+    "explorer",
+    "architecture",
+    "branches"
+  ],
+  "galleryBanner": {
+    "color": "#0b0f19",
+    "theme": "dark"
+  },
   "engines": {
     "vscode": "^1.90.0"
   },
@@ -11,27 +34,64 @@
     "Visualization",
     "Other"
   ],
-  "main": "./dist/extension.js",
+  "type": "module",
+  "main": "./dist/extension.cjs",
   "activationEvents": [],
   "contributes": {
     "commands": [
       {
         "command": "spaghetti.visualize",
         "title": "Spaghetti: Visualize Codebase",
-        "category": "Spaghetti"
+        "category": "Spaghetti",
+        "icon": "$(type-hierarchy)"
       }
-    ]
+    ],
+    "menus": {
+      "editor/title": [
+        {
+          "command": "spaghetti.visualize",
+          "group": "navigation",
+          "when": "workspaceFolderCount > 0"
+        }
+      ]
+    },
+    "configuration": {
+      "title": "Spaghetti Canvas",
+      "properties": {
+        "spaghetti.ignoredDirectories": {
+          "type": "array",
+          "items": { "type": "string" },
+          "default": ["node_modules", ".git", "dist", "build", ".svelte-kit", "target", "out", ".vercel", ".turbo", ".next", ".nuxt", "coverage", ".nyc_output", "worktrees", "__pycache__", ".pytest_cache", "vendor"],
+          "description": "Directories to exclude when scanning the codebase."
+        },
+        "spaghetti.allowedExtensions": {
+          "type": "array",
+          "items": { "type": "string" },
+          "default": [".ts", ".js", ".svelte", ".json", ".html", ".css", ".rs", ".py", ".md"],
+          "description": "File extensions to include in the dependency graph."
+        },
+        "spaghetti.maxPreviewLines": {
+          "type": "number",
+          "default": 20,
+          "minimum": 5,
+          "maximum": 50,
+          "description": "Number of lines shown in each file card preview."
+        }
+      }
+    }
   },
-  "type": "module",
   "scripts": {
     "dev": "vite",
     "build:web": "vite build",
     "build:ext": "bun build-extension.ts",
     "build": "bun run build:web && bun run build:ext",
     "preview": "vite preview",
-    "check": "svelte-check --tsconfig ./tsconfig.json"
+    "check": "svelte-check --tsconfig ./tsconfig.json",
+    "icon": "bun generate-icon.ts",
+    "package": "vsce package --no-dependencies"
   },
   "devDependencies": {
+    "@resvg/resvg-js": "^2.6.2",
     "@sveltejs/vite-plugin-svelte": "^4.0.0",
     "@tsconfig/svelte": "^5.0.4",
     "@types/node": "^22.0.0",
@@ -40,7 +100,8 @@
     "svelte-check": "^4.0.0",
     "tslib": "^2.6.3",
     "typescript": "^5.6.3",
-    "vite": "^5.4.11"
+    "vite": "^5.4.11",
+    "@vscode/vsce": "^3.0.0"
   },
   "dependencies": {
     "highlight.js": "^11.11.1"

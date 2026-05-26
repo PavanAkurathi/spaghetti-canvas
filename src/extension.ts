@@ -22,12 +22,24 @@ interface CodebaseGraph {
   links: CodeLink[];
 }
 
-const IGNORE_DIRS = new Set([
+const DEFAULT_IGNORE_DIRS = [
   'node_modules', '.git', 'dist', 'build', '.svelte-kit', 'target', 'out',
   '.vercel', '.turbo', '.next', '.nuxt', 'coverage', '.nyc_output',
   'worktrees', '__pycache__', '.pytest_cache', 'vendor',
-]);
-const ALLOWED_EXTENSIONS = new Set(['.ts', '.js', '.svelte', '.json', '.html', '.css', '.rs', '.py', '.md']);
+];
+const DEFAULT_EXTENSIONS = ['.ts', '.js', '.svelte', '.json', '.html', '.css', '.rs', '.py', '.md'];
+
+function getConfig() {
+  const cfg = vscode.workspace.getConfiguration('spaghetti');
+  const ignoredDirs = new Set<string>(cfg.get<string[]>('ignoredDirectories') ?? DEFAULT_IGNORE_DIRS);
+  const allowedExts = new Set<string>(cfg.get<string[]>('allowedExtensions') ?? DEFAULT_EXTENSIONS);
+  const maxPreviewLines = cfg.get<number>('maxPreviewLines') ?? 20;
+  return { ignoredDirs, allowedExts, maxPreviewLines };
+}
+
+// Use getter for backwards-compat with the static-scan helpers below
+const IGNORE_DIRS = new Set(DEFAULT_IGNORE_DIRS);
+const ALLOWED_EXTENSIONS = new Set(DEFAULT_EXTENSIONS);
 
 // Recursively walks the directory and collects relative file paths
 function scanDirectory(dirPath: string, rootDir: string, filesList: string[] = []): string[] {
@@ -188,7 +200,9 @@ export function activate(context: vscode.ExtensionContext) {
       return;
     }
 
+    // Use the first workspace folder but respect all roots for active-file detection
     const rootPath = workspaceFolders[0].uri.fsPath;
+    const allRoots = workspaceFolders.map(f => f.uri.fsPath);
 
     // Create and show Webview Panel
     const panel = vscode.window.createWebviewPanel(
@@ -231,12 +245,17 @@ export function activate(context: vscode.ExtensionContext) {
     });
     context.subscriptions.push(saveListener);
 
-    // --- Active file tracking ---
+    // --- Active file tracking (works across all workspace roots) ---
     const sendActiveFile = (editor: vscode.TextEditor | undefined) => {
       if (!editor || !panel.visible) return;
-      const rel = path.relative(rootPath, editor.document.uri.fsPath);
-      if (!rel.startsWith('..') && !path.isAbsolute(rel)) {
-        panel.webview.postMessage({ command: 'activeFile', path: rel });
+      const filePath = editor.document.uri.fsPath;
+      // Find which root this file belongs to
+      for (const root of allRoots) {
+        const rel = path.relative(root, filePath);
+        if (!rel.startsWith('..') && !path.isAbsolute(rel)) {
+          panel.webview.postMessage({ command: 'activeFile', path: rel });
+          return;
+        }
       }
     };
 
@@ -256,10 +275,13 @@ export function activate(context: vscode.ExtensionContext) {
       async (message) => {
         switch (message.command) {
           case 'ready': {
-            // Webview requested graph data, scan workspace in-process
+            // Webview requested graph data — scan using current settings
             try {
               const graph = generateGraph(rootPath);
               panel.webview.postMessage({ command: 'setGraphData', data: graph });
+              // Tell webview which settings are active
+              const { maxPreviewLines } = getConfig();
+              panel.webview.postMessage({ command: 'settings', maxPreviewLines });
               // Also tell the webview which file is currently active
               sendActiveFile(vscode.window.activeTextEditor);
             } catch (err: any) {

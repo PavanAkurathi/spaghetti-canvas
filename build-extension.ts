@@ -7,7 +7,8 @@ const result = await build({
   outdir: './dist',
   target: 'node',
   external: ['vscode'],
-  format: 'cjs', // CommonJS target for VS Code extension execution
+  format: 'cjs', // CommonJS required by VS Code extension host
+  naming: '[dir]/extension.cjs', // .cjs suffix avoids "type":"module" ESM mis-parsing
   minify: false,
 });
 
@@ -19,4 +20,4 @@ if (!result.success) {
   process.exit(1);
 }
 
-console.log('Successfully compiled extension to dist/extension.js!');
+console.log('Successfully compiled extension to dist/extension.cjs!');

@@ -1,0 +1,23 @@
+# Source files (not needed in the packaged extension)
+src/
+public/
+.github/
+.claude/
+.vscode/
+
+# Build/dev tooling
+vite.config.ts
+build-extension.ts
+generate-icon.ts
+tsconfig.json
+bun.lock
+index.html
+icon.svg
+
+# Dev-only outputs
+check_output.txt
+*.vsix
+
+# Misc
+.gitignore
+.DS_Store

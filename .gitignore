@@ -20,3 +20,6 @@ dist/
 
 # Scratch / generated output
 check_output.txt
+
+# Packaged extension (build artifact)
+*.vsix

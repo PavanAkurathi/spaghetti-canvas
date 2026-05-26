@@ -1,0 +1,42 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="128" height="128" viewBox="0 0 128 128">
+  <!-- Background -->
+  <rect width="128" height="128" rx="24" fill="#0b0f19"/>
+
+  <!-- Spaghetti strands / bezier network -->
+  <!-- Node dots -->
+  <circle cx="24" cy="40" r="5" fill="#6366f1" opacity="0.9"/>
+  <circle cx="64" cy="22" r="5" fill="#10b981" opacity="0.9"/>
+  <circle cx="104" cy="40" r="5" fill="#6366f1" opacity="0.9"/>
+  <circle cx="20" cy="88" r="5" fill="#f59e0b" opacity="0.9"/>
+  <circle cx="64" cy="106" r="5" fill="#ef4444" opacity="0.9"/>
+  <circle cx="108" cy="88" r="5" fill="#8b5cf6" opacity="0.9"/>
+  <circle cx="64" cy="64" r="7" fill="#6366f1"/>
+
+  <!-- Bezier connection curves -->
+  <path d="M24 40 C36 28, 52 22, 64 22" stroke="#6366f1" stroke-width="2" fill="none" opacity="0.6"/>
+  <path d="M64 22 C80 22, 96 32, 104 40" stroke="#10b981" stroke-width="2" fill="none" opacity="0.6"/>
+  <path d="M104 40 C112 60, 112 70, 108 88" stroke="#6366f1" stroke-width="2" fill="none" opacity="0.6"/>
+  <path d="M108 88 C90 106, 78 106, 64 106" stroke="#8b5cf6" stroke-width="2" fill="none" opacity="0.6"/>
+  <path d="M64 106 C48 106, 32 96, 20 88" stroke="#ef4444" stroke-width="2" fill="none" opacity="0.6"/>
+  <path d="M20 88 C16 68, 18 52, 24 40" stroke="#f59e0b" stroke-width="2" fill="none" opacity="0.6"/>
+
+  <!-- Cross connections (spaghetti tangle) -->
+  <path d="M24 40 C44 52, 44 76, 64 106" stroke="#6366f1" stroke-width="1.5" fill="none" opacity="0.35"/>
+  <path d="M104 40 C84 52, 84 76, 64 106" stroke="#10b981" stroke-width="1.5" fill="none" opacity="0.35"/>
+  <path d="M64 22 C64 44, 64 44, 20 88" stroke="#10b981" stroke-width="1.5" fill="none" opacity="0.35"/>
+  <path d="M64 22 C64 44, 64 44, 108 88" stroke="#6366f1" stroke-width="1.5" fill="none" opacity="0.35"/>
+  <path d="M24 40 C48 64, 80 64, 108 88" stroke="#f59e0b" stroke-width="1.5" fill="none" opacity="0.3"/>
+
+  <!-- Center hub glow -->
+  <circle cx="64" cy="64" r="14" fill="#6366f1" opacity="0.12"/>
+  <circle cx="64" cy="64" r="7" fill="#6366f1" opacity="0.95"/>
+  <circle cx="64" cy="64" r="3.5" fill="white" opacity="0.6"/>
+
+  <!-- Spoke connections to center -->
+  <line x1="64" y1="64" x2="24" y2="40" stroke="#6366f1" stroke-width="1.5" opacity="0.5"/>
+  <line x1="64" y1="64" x2="64" y2="22" stroke="#10b981" stroke-width="1.5" opacity="0.5"/>
+  <line x1="64" y1="64" x2="104" y2="40" stroke="#6366f1" stroke-width="1.5" opacity="0.5"/>
+  <line x1="64" y1="64" x2="108" y2="88" stroke="#8b5cf6" stroke-width="1.5" opacity="0.5"/>
+  <line x1="64" y1="64" x2="64" y2="106" stroke="#ef4444" stroke-width="1.5" opacity="0.5"/>
+  <line x1="64" y1="64" x2="20" y2="88" stroke="#f59e0b" stroke-width="1.5" opacity="0.5"/>
+</svg>

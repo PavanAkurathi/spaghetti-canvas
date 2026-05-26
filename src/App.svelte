@@ -133,6 +133,20 @@
   // VS Code active file tracking
   let activeFileId = $state<string | null>(null);
 
+  // Branch canvas interaction
+  let selectedBranchName = $state<string | null>(null);
+  const selectedBranch = $derived(branchNodes.find(b => b.name === selectedBranchName) ?? null);
+
+  // Branch search
+  let branchSearchQuery = $state('');
+  const branchMatchNames = $derived(() => {
+    if (!branchSearchQuery) return null;
+    const q = branchSearchQuery.toLowerCase();
+    return new Set(branchNodes.filter(b =>
+      b.name.toLowerCase().includes(q) || b.message.toLowerCase().includes(q)
+    ).map(b => b.name));
+  });
+
   // VS Code API integration
   let vscode = $state<VSCodeApi | null>(null);
   try {
@@ -247,6 +261,30 @@
     const nodeH = node.height ?? 178;
     panX = viewportW / 2 - (node.x + nodeW / 2) * scale;
     panY = viewportH / 2 - (node.y + nodeH / 2) * scale;
+  }
+
+  // Jump to the first search match (called on Enter in the search box)
+  function jumpToFirstMatch() {
+    const ids = searchMatchIds();
+    if (!ids || ids.size === 0) return;
+    const firstId = [...ids][0];
+    const node = graphData.nodes.find(n => n.id === firstId);
+    if (node) {
+      selectedNodeId = firstId;
+      // Zoom to a comfortable reading level then center
+      scale = Math.max(scale, 0.5);
+      panToNode(node);
+    }
+  }
+
+  function panToBranch(branch: BranchNode) {
+    if (branch.x === undefined || branch.y === undefined) return;
+    const viewportW = window.innerWidth;
+    const viewportH = window.innerHeight - 64;
+    const bW = branch.width ?? 300;
+    const bH = branch.height ?? 120;
+    panX = viewportW / 2 - (branch.x + bW / 2) * scale;
+    panY = viewportH / 2 - (branch.y + bH / 2) * scale;
   }
 
   // --- Layout Algorithm ---
@@ -627,6 +665,24 @@
         </div>
       {/if}
 
+      {#if mode === 'branches'}
+        <div class="controls">
+          <div class="search-box">
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="search-icon">
+              <path fill-rule="evenodd" d="M9 3.5a5.5 5.5 0 100 11 5.5 5.5 0 000-11zM2 9a7 7 0 1112.452 4.391l3.328 3.329a.75.75 0 11-1.06 1.06l-3.329-3.328A7 7 0 012 9z" clip-rule="evenodd" />
+            </svg>
+            <input
+              type="text"
+              placeholder="Search branches…"
+              bind:value={branchSearchQuery}
+            />
+            {#if branchSearchQuery}
+              <button class="clear-btn" onclick={() => branchSearchQuery = ''}>&times;</button>
+            {/if}
+          </div>
+        </div>
+      {/if}
+
       {#if mode === 'files'}
       <div class="controls">
         <!-- Search Input -->
@@ -636,8 +692,9 @@
           </svg>
           <input
             type="text"
-            placeholder="Search files..."
+            placeholder="Search files… (Enter to jump)"
             bind:value={searchQuery}
+            onkeydown={(e) => e.key === 'Enter' && jumpToFirstMatch()}
           />
           {#if searchQuery}
             <button class="clear-btn" onclick={() => searchQuery = ''}>&times;</button>
@@ -863,23 +920,29 @@
               {#if branch.x !== undefined}
                 {@const color = getBranchColor(branch.type)}
                 {@const isHovered = hoveredBranchName === branch.name}
+                {@const isSelected = selectedBranchName === branch.name}
+                {@const isSearchDimmed = branchMatchNames() !== null && !branchMatchNames()!.has(branch.name)}
                 {@const slashIdx = branch.name.indexOf('/')}
                 {@const prefix = slashIdx >= 0 ? branch.name.slice(0, slashIdx) : ''}
                 {@const shortName = slashIdx >= 0 ? branch.name.slice(slashIdx + 1) : branch.name}
                 <g
                   class="branch-card"
                   class:branch-hovered={isHovered}
+                  class:branch-selected={isSelected}
+                  class:dimmed={isSearchDimmed}
                   transform="translate({branch.x}, {branch.y})"
                   onmouseenter={() => hoveredBranchName = branch.name}
                   onmouseleave={() => hoveredBranchName = null}
+                  onclick={() => { selectedBranchName = branch.name; panToBranch(branch); }}
                 >
                   <rect
                     width={branch.width}
                     height={branch.height}
                     rx="10"
                     fill="#0f172a"
-                    stroke={isHovered ? color : '#1e293b'}
-                    stroke-width={isHovered ? 2 : 1}
+                    stroke={isSelected ? color : isHovered ? color : '#1e293b'}
+                    stroke-width={isSelected || isHovered ? 2 : 1}
+                    stroke-opacity={isSelected ? 1 : isHovered ? 0.8 : 1}
                   />
                   <rect x="0" y="0" width="4" height={branch.height} rx="2" fill={color} />
                   <foreignObject x="4" y="0" width={(branch.width ?? 300) - 4} height={branch.height}>
@@ -995,6 +1058,74 @@
               </ul>
             {:else}
               <p class="empty-text">Not imported by any other scanned files.</p>
+            {/if}
+          </div>
+        </div>
+      </aside>
+    {/if}
+
+    <!-- Branch Details Sidebar -->
+    {#if selectedBranch}
+      {@const color = getBranchColor(selectedBranch.type)}
+      <aside class="sidebar">
+        <div class="sidebar-header">
+          <h2>Branch Details</h2>
+          <button class="close-sidebar-btn" onclick={() => selectedBranchName = null}>&times;</button>
+        </div>
+        <div class="sidebar-content">
+          <div class="detail-group file-header">
+            <span class="file-badge" style="background:{color}1a; color:{color}; border:1px solid {color}33">
+              {selectedBranch.type}
+            </span>
+            <h3 style="word-break:break-all">{selectedBranch.name}</h3>
+          </div>
+
+          <div class="detail-card">
+            <div class="card-item">
+              <span class="label">Commit</span>
+              <code class="value" style="font-family:monospace;color:#6366f1">{selectedBranch.shortHash}</code>
+            </div>
+            <div class="card-item">
+              <span class="label">Last updated</span>
+              <span class="value">{selectedBranch.relativeTime}</span>
+            </div>
+            {#if selectedBranch.parentBranch}
+              <div class="card-item">
+                <span class="label">Branched from</span>
+                <button class="link-to-file" onclick={() => {
+                  selectedBranchName = selectedBranch?.parentBranch ?? null;
+                  const parent = branchNodes.find(b => b.name === selectedBranch?.parentBranch);
+                  if (parent) panToBranch(parent);
+                }}>
+                  {selectedBranch.parentBranch}
+                </button>
+              </div>
+            {/if}
+            <div class="card-item" style="flex-direction:column;align-items:flex-start;gap:4px">
+              <span class="label">Commit message</span>
+              <span class="value" style="font-size:0.8rem;color:#94a3b8">{selectedBranch.message}</span>
+            </div>
+          </div>
+
+          <div class="detail-group">
+            <h4>Changed Files ({selectedBranch.changedFiles.length})</h4>
+            {#if selectedBranch.changedFiles.length > 0}
+              <ul class="dep-list">
+                {#each selectedBranch.changedFiles as file}
+                  <li>
+                    <div class="changed-file-row">
+                      <span class="changed-file-status" style="color:{fileStatusColor(file.status)}">{fileStatusIcon(file.status)}</span>
+                      <button class="link-to-file" onclick={() => {
+                        if (vscode) vscode.postMessage({ command: 'openFile', path: file.path });
+                      }}>
+                        {file.path}
+                      </button>
+                    </div>
+                  </li>
+                {/each}
+              </ul>
+            {:else}
+              <p class="empty-text">No changed files detected.</p>
             {/if}
           </div>
         </div>
@@ -1514,10 +1645,6 @@
   }
 
   /* --- Branch Canvas --- */
-  .branch-card {
-    cursor: default;
-    transition: opacity 0.2s;
-  }
   .branch-hovered :global(rect:first-child) {
     filter: drop-shadow(0 0 10px rgba(99, 102, 241, 0.35));
   }
@@ -1638,6 +1765,34 @@
     color: #374151;
     font-style: italic;
     padding-left: 15px;
+  }
+
+  /* --- Branch card selected state --- */
+  .branch-card {
+    cursor: pointer;
+    transition: opacity 0.2s;
+  }
+  .branch-card.dimmed {
+    opacity: 0.15;
+  }
+  .branch-selected :global(rect:first-child) {
+    filter: drop-shadow(0 0 12px rgba(99, 102, 241, 0.5));
+  }
+
+  /* --- Changed file row in branch sidebar --- */
+  .changed-file-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    width: 100%;
+  }
+  .changed-file-status {
+    font-size: 0.8rem;
+    font-weight: 700;
+    width: 14px;
+    text-align: center;
+    flex-shrink: 0;
+    font-family: monospace;
   }
 
   /* --- Active File (VS Code tracked) --- */
