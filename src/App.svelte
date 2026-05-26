@@ -133,6 +133,15 @@
   // VS Code active file tracking
   let activeFileId = $state<string | null>(null);
 
+  // Viewport dimensions — kept in sync with window resize for accurate culling
+  let viewportW = $state(typeof window !== 'undefined' ? window.innerWidth : 1920);
+  let viewportH = $state(typeof window !== 'undefined' ? window.innerHeight - 64 : 1080);
+
+  // rAF handle + pending values for pan throttling
+  let _rafPan: number | null = null;
+  let _pendingX = 0;
+  let _pendingY = 0;
+
   // Branch canvas interaction
   let selectedBranchName = $state<string | null>(null);
   const selectedBranch = $derived(branchNodes.find(b => b.name === selectedBranchName) ?? null);
@@ -205,6 +214,57 @@
     selectedNodeId ? graphData.links.filter(l => l.target === selectedNodeId) : []
   );
 
+  // O(1) node lookup — avoids O(n) .find() inside the link render loop
+  const nodeById = $derived(() => {
+    const m = new Map<string, CodeNode>();
+    for (const n of graphData.nodes) m.set(n.id, n);
+    return m;
+  });
+
+  // --- Viewport Culling ---
+  // Buffer (canvas-space px) added to each edge so nodes pop in just before they enter view
+  const CULL_BUFFER = 300;
+
+  const visibleNodeIds = $derived(() => {
+    const bx = -panX / scale - CULL_BUFFER;
+    const by = -panY / scale - CULL_BUFFER;
+    const br = (-panX + viewportW) / scale + CULL_BUFFER;
+    const bb = (-panY + viewportH) / scale + CULL_BUFFER;
+    const ids = new Set<string>();
+    for (const node of graphData.nodes) {
+      if (node.x === undefined) continue;
+      if (node.x + (node.width ?? 280) > bx && node.x < br &&
+          (node.y ?? 0) + (node.height ?? 178) > by && (node.y ?? 0) < bb)
+        ids.add(node.id);
+    }
+    return ids;
+  });
+
+  const visibleFolderPaths = $derived(() => {
+    const bx = -panX / scale - CULL_BUFFER;
+    const by = -panY / scale - CULL_BUFFER;
+    const br = (-panX + viewportW) / scale + CULL_BUFFER;
+    const bb = (-panY + viewportH) / scale + CULL_BUFFER;
+    return new Set(folders
+      .filter(f => f.x + f.width > bx && f.x < br && f.y + f.height > by && f.y < bb)
+      .map(f => f.path));
+  });
+
+  const visibleBranchNames = $derived(() => {
+    const bx = -panX / scale - CULL_BUFFER;
+    const by = -panY / scale - CULL_BUFFER;
+    const br = (-panX + viewportW) / scale + CULL_BUFFER;
+    const bb = (-panY + viewportH) / scale + CULL_BUFFER;
+    const names = new Set<string>();
+    for (const b of branchNodes) {
+      if (b.x === undefined) continue;
+      if (b.x + (b.width ?? 300) > bx && b.x < br &&
+          (b.y ?? 0) + (b.height ?? 120) > by && (b.y ?? 0) < bb)
+        names.add(b.name);
+    }
+    return names;
+  });
+
   // Load data and run layout
   onMount(() => {
     const messageListener = (event: MessageEvent) => {
@@ -255,8 +315,6 @@
   // Pan the canvas to center a specific node (used for active file tracking)
   function panToNode(node: CodeNode) {
     if (node.x === undefined || node.y === undefined) return;
-    const viewportW = window.innerWidth;
-    const viewportH = window.innerHeight - 64;
     const nodeW = node.width ?? 280;
     const nodeH = node.height ?? 178;
     panX = viewportW / 2 - (node.x + nodeW / 2) * scale;
@@ -279,8 +337,6 @@
 
   function panToBranch(branch: BranchNode) {
     if (branch.x === undefined || branch.y === undefined) return;
-    const viewportW = window.innerWidth;
-    const viewportH = window.innerHeight - 64;
     const bW = branch.width ?? 300;
     const bH = branch.height ?? 120;
     panX = viewportW / 2 - (branch.x + bW / 2) * scale;
@@ -397,8 +453,6 @@
   function fitView(layouts: FolderLayout[]) {
     if (layouts.length === 0) return;
 
-    const viewportW = window.innerWidth;
-    const viewportH = window.innerHeight - 64;
     const padding = 60;
 
     const minX = Math.min(...layouts.map(f => f.x));
@@ -431,8 +485,15 @@
 
   function handleMouseMove(e: MouseEvent) {
     if (!isDragging) return;
-    panX = e.clientX - startX;
-    panY = e.clientY - startY;
+    _pendingX = e.clientX - startX;
+    _pendingY = e.clientY - startY;
+    if (_rafPan === null) {
+      _rafPan = requestAnimationFrame(() => {
+        panX = _pendingX;
+        panY = _pendingY;
+        _rafPan = null;
+      });
+    }
   }
 
   function handleMouseUp() {
@@ -575,8 +636,6 @@
   function fitBranchView() {
     const laid = branchNodes.filter(b => b.x !== undefined);
     if (laid.length === 0) return;
-    const viewportW = window.innerWidth;
-    const viewportH = window.innerHeight - 64;
     const padding = 60;
     const minX = Math.min(...laid.map(b => b.x!));
     const minY = Math.min(...laid.map(b => b.y!));
@@ -630,7 +689,11 @@
 </script>
 
 <!-- Window Level Events for Pan Dragging -->
-<svelte:window onmouseup={handleMouseUp} onmousemove={handleMouseMove} />
+<svelte:window
+  onmouseup={handleMouseUp}
+  onmousemove={handleMouseMove}
+  onresize={() => { viewportW = window.innerWidth; viewportH = window.innerHeight - 64; }}
+/>
 
 <main class="spaghetti-app">
   {#if isLoading}
@@ -742,8 +805,8 @@
           </pattern>
         </defs>
         
-        <!-- Apply zoom/pan transformation -->
-        <g transform="translate({panX}, {panY}) scale({scale})">
+        <!-- Apply zoom/pan transformation — CSS transform for GPU compositor layer -->
+        <g class="canvas-world" style="transform: translate({panX}px, {panY}px) scale({scale}); transform-origin: 0 0;">
           <!-- Render grid background inside view scope -->
           <rect 
             x="-5000" 
@@ -755,27 +818,34 @@
           />
 
           {#if mode === 'files'}
-          <!-- Links (Dependency Curves) -->
+          {@const _nb = nodeById()}
+          {@const _vnIds = visibleNodeIds()}
+          {@const _vfPaths = visibleFolderPaths()}
+          {@const _smIds = searchMatchIds()}
+          {@const _hlIds = highlightedNodeIds()}
+          <!-- Links (Dependency Curves) — culled to visible endpoints -->
           <g class="links-layer">
             {#each graphData.links as link}
-              {@const srcNode = graphData.nodes.find(n => n.id === link.source)}
-              {@const tgtNode = graphData.nodes.find(n => n.id === link.target)}
-              {#if srcNode && tgtNode}
-                {@const isHoveredSrc = hoveredNodeId === link.source}
-                {@const isHoveredTgt = hoveredNodeId === link.target}
-                {@const isDimmed = hoveredNodeId !== null && !isHoveredSrc && !isHoveredTgt}
-                {@const isHighlighted = hoveredNodeId !== null && (isHoveredSrc || isHoveredTgt)}
-                
-                <path
-                  d={getLinkPath(srcNode, tgtNode)}
-                  class="dependency-link"
-                  class:dimmed={isDimmed}
-                  class:highlight-out={isHoveredSrc}
-                  class:highlight-in={isHoveredTgt}
-                  stroke={isHoveredSrc ? '#ec4899' : isHoveredTgt ? '#10b981' : 'rgba(99, 102, 241, 0.55)'}
-                  stroke-width={isHighlighted ? 4 : 2}
-                  fill="none"
-                />
+              {#if _vnIds.has(link.source) || _vnIds.has(link.target)}
+                {@const srcNode = _nb.get(link.source)}
+                {@const tgtNode = _nb.get(link.target)}
+                {#if srcNode && tgtNode}
+                  {@const isHoveredSrc = hoveredNodeId === link.source}
+                  {@const isHoveredTgt = hoveredNodeId === link.target}
+                  {@const isDimmed = hoveredNodeId !== null && !isHoveredSrc && !isHoveredTgt}
+                  {@const isHighlighted = hoveredNodeId !== null && (isHoveredSrc || isHoveredTgt)}
+
+                  <path
+                    d={getLinkPath(srcNode, tgtNode)}
+                    class="dependency-link"
+                    class:dimmed={isDimmed}
+                    class:highlight-out={isHoveredSrc}
+                    class:highlight-in={isHoveredTgt}
+                    stroke={isHoveredSrc ? '#ec4899' : isHoveredTgt ? '#10b981' : 'rgba(99, 102, 241, 0.55)'}
+                    stroke-width={isHighlighted ? 4 : 2}
+                    fill="none"
+                  />
+                {/if}
               {/if}
             {/each}
           </g>
@@ -783,6 +853,7 @@
           <!-- Folders & Files Layout -->
           <g class="folders-layer">
             {#each folders as folder}
+              {#if _vfPaths.has(folder.path)}
               <!-- Outer Folder Pane (Glassmorphic Container) -->
               <g class="folder-group" transform="translate({folder.x}, {folder.y})">
                 <rect
@@ -805,28 +876,28 @@
                 </text>
 
                 <!-- Line divider under header -->
-                <line 
-                  x1="0" 
-                  y1="48" 
-                  x2={folder.width} 
-                  y2="48" 
-                  stroke="rgba(30, 41, 59, 0.8)" 
+                <line
+                  x1="0"
+                  y1="48"
+                  x2={folder.width}
+                  y2="48"
+                  stroke="rgba(30, 41, 59, 0.8)"
                   stroke-width="1.5"
                 />
               </g>
+              {/if}
             {/each}
 
-            <!-- Individual File Cards (interactive-node overlay) -->
+            <!-- Individual File Cards — culled to visible viewport -->
             {#each graphData.nodes as node}
-              {@const isHovered = hoveredNodeId === node.id}
-              {@const isSelected = selectedNodeId === node.id}
-              {@const isActive = activeFileId === node.id}
-              {@const isSearchResult = searchMatchIds() ? searchMatchIds()!.has(node.id) : true}
-              {@const isExtensionFiltered = activeExtensionFilter === 'all' || node.extension === activeExtensionFilter}
-              {@const isFilteredOut = !isSearchResult || !isExtensionFiltered}
-              {@const isDimmed = (hoveredNodeId !== null && !highlightedNodeIds().has(node.id)) || isFilteredOut}
-              
-              {#if node.x !== undefined && node.y !== undefined}
+              {#if node.x !== undefined && node.y !== undefined && _vnIds.has(node.id)}
+                {@const isHovered = hoveredNodeId === node.id}
+                {@const isSelected = selectedNodeId === node.id}
+                {@const isActive = activeFileId === node.id}
+                {@const isSearchResult = _smIds ? _smIds.has(node.id) : true}
+                {@const isExtensionFiltered = activeExtensionFilter === 'all' || node.extension === activeExtensionFilter}
+                {@const isFilteredOut = !isSearchResult || !isExtensionFiltered}
+                {@const isDimmed = (hoveredNodeId !== null && !_hlIds.has(node.id)) || isFilteredOut}
                 <g
                   class="interactive-node"
                   class:dimmed={isDimmed}
@@ -895,10 +966,11 @@
             {/each}
           </g>
           {:else}
-          <!-- Branch links -->
+          <!-- Branch links — culled to visible branches -->
+          {@const _vbNames = visibleBranchNames()}
           <g class="branch-links-layer">
             {#each branchNodes as branch}
-              {#if branch.parentBranch}
+              {#if branch.parentBranch && (_vbNames.has(branch.name) || _vbNames.has(branch.parentBranch ?? ''))}
                 {@const parentNode = branchNodes.find(b => b.name === branch.parentBranch)}
                 {#if parentNode && parentNode.x !== undefined && branch.x !== undefined}
                   {@const color = getBranchColor(branch.type)}
@@ -914,10 +986,10 @@
             {/each}
           </g>
 
-          <!-- Branch cards -->
+          <!-- Branch cards — culled to visible branches -->
           <g class="branch-cards-layer">
             {#each branchNodes as branch}
-              {#if branch.x !== undefined}
+              {#if branch.x !== undefined && _vbNames.has(branch.name)}
                 {@const color = getBranchColor(branch.type)}
                 {@const isHovered = hoveredBranchName === branch.name}
                 {@const isSelected = selectedBranchName === branch.name}
@@ -1338,6 +1410,10 @@
     display: block;
     width: 100%;
     height: 100%;
+  }
+  /* Promote the pan/zoom group to its own GPU compositor layer */
+  .canvas-world {
+    will-change: transform;
   }
 
   /* --- Folders Layout --- */
