@@ -1,0 +1,296 @@
+{
+  "branches": [
+    {
+      "name": "feat/unread-counts-briefing-audio",
+      "shortHash": "80d0abd",
+      "fullHash": "80d0abd45ace9a9876a030cbced9e87fd90f0988",
+      "message": "feat: unread tracking, briefing audio/speed-read, and AI error fixes",
+      "timestamp": 1779117109,
+      "relativeTime": "7d ago",
+      "parentBranch": null,
+      "changedFiles": [],
+      "type": "feat"
+    },
+    {
+      "name": "feat/opml-import",
+      "shortHash": "b8ab4bb",
+      "fullHash": "b8ab4bbb64f7de106c28e07c5e7a7fd150265e32",
+      "message": "feat: OPML import — bulk subscribe from exported feed files",
+      "timestamp": 1779117952,
+      "relativeTime": "7d ago",
+      "parentBranch": "feat/unread-counts-briefing-audio",
+      "changedFiles": [
+        {
+          "path": "src/lib/components/Sidebar.svelte",
+          "status": "M",
+          "extension": ".svelte"
+        },
+        {
+          "path": "src/routes/api/feeds/import-opml/+server.ts",
+          "status": "A",
+          "extension": ".ts"
+        }
+      ],
+      "type": "feat"
+    },
+    {
+      "name": "feat/keyboard-shortcuts",
+      "shortHash": "e709f65",
+      "fullHash": "e709f659b315c7d87dea5cef7e72ae40035437f5",
+      "message": "Add keyboard shortcuts, article thumbnails, and starter packs",
+      "timestamp": 1779143328,
+      "relativeTime": "7d ago",
+      "parentBranch": "feat/opml-import",
+      "changedFiles": [
+        {
+          "path": "src/lib/components/FeedPane.svelte",
+          "status": "M",
+          "extension": ".svelte"
+        },
+        {
+          "path": "src/lib/components/ShortcutsOverlay.svelte",
+          "status": "M",
+          "extension": ".svelte"
+        },
+        {
+          "path": "src/lib/components/Sidebar.svelte",
+          "status": "M",
+          "extension": ".svelte"
+        },
+        {
+          "path": "src/lib/data/starter-packs.ts",
+          "status": "A",
+          "extension": ".ts"
+        },
+        {
+          "path": "src/lib/server/sources/rss/adapter.ts",
+          "status": "M",
+          "extension": ".ts"
+        },
+        {
+          "path": "src/routes/+page.server.ts",
+          "status": "M",
+          "extension": ".ts"
+        },
+        {
+          "path": "src/routes/+page.svelte",
+          "status": "M",
+          "extension": ".svelte"
+        },
+        {
+          "path": "src/routes/api/feeds/import-opml/+server.ts",
+          "status": "M",
+          "extension": ".ts"
+        }
+      ],
+      "type": "feat"
+    },
+    {
+      "name": "feat/google-news-topics-and-fixes",
+      "shortHash": "aca8741",
+      "fullHash": "aca8741eb50d1e7d6ef109021977d1f3291bb33e",
+      "message": "feat: Google News topic search, Daily Briefing fix, feed sync improvements",
+      "timestamp": 1779413536,
+      "relativeTime": "4d ago",
+      "parentBranch": "feat/keyboard-shortcuts",
+      "changedFiles": [
+        {
+          "path": ".gitignore",
+          "status": "M",
+          "extension": ""
+        },
+        {
+          "path": "output/playwright/signed-in-real-account-cookie-preserved-chai-success.png",
+          "status": "A",
+          "extension": ".png"
+        },
+        {
+          "path": "package-lock.json",
+          "status": "M",
+          "extension": ".json"
+        },
+        {
+          "path": "package.json",
+          "status": "M",
+          "extension": ".json"
+        },
+        {
+          "path": "src/lib/components/DiscoverPane.svelte",
+          "status": "A",
+          "extension": ".svelte"
+        },
+        {
+          "path": "src/lib/components/FeedPane.svelte",
+          "status": "M",
+          "extension": ".svelte"
+        },
+        {
+          "path": "src/lib/components/ReadingPane.svelte",
+          "status": "M",
+          "extension": ".svelte"
+        },
+        {
+          "path": "src/lib/components/SettingsSheet.svelte",
+          "status": "M",
+          "extension": ".svelte"
+        },
+        {
+          "path": "src/lib/components/Sidebar.svelte",
+          "status": "M",
+          "extension": ".svelte"
+        },
+        {
+          "path": "src/lib/components/article/treatments/BriefingTreatment.svelte",
+          "status": "M",
+          "extension": ".svelte"
+        },
+        {
+          "path": "src/lib/components/article/treatments/DiscussionTreatment.svelte",
+          "status": "M",
+          "extension": ".svelte"
+        },
+        {
+          "path": "src/lib/components/article/treatments/NewsletterTreatment.svelte",
+          "status": "M",
+          "extension": ".svelte"
+        },
+        {
+          "path": "src/lib/components/article/treatments/RssTreatment.svelte",
+          "status": "M",
+          "extension": ".svelte"
+        },
+        {
+          "path": "src/lib/server/db/migrations/0006_user_tier_source_seed.sql",
+          "status": "A",
+          "extension": ".sql"
+        },
+        {
+          "path": "src/lib/server/services/llm.ts",
+          "status": "M",
+          "extension": ".ts"
+        }
+      ],
+      "type": "feat"
+    },
+    {
+      "name": "feat/security-hardening-magazine-ui",
+      "shortHash": "48266f9",
+      "fullHash": "48266f902a6929caaf2e44f90874750eeef01064",
+      "message": "chore: add bre.json BRE task contract for security audit",
+      "timestamp": 1779469903,
+      "relativeTime": "3d ago",
+      "parentBranch": "feat/google-news-topics-and-fixes",
+      "changedFiles": [
+        {
+          "path": ".env.example",
+          "status": "M",
+          "extension": ".example"
+        },
+        {
+          "path": "bre.json",
+          "status": "A",
+          "extension": ".json"
+        },
+        {
+          "path": "src/lib/components/DiscoverPane.svelte",
+          "status": "M",
+          "extension": ".svelte"
+        },
+        {
+          "path": "src/lib/components/FeedPane.svelte",
+          "status": "M",
+          "extension": ".svelte"
+        },
+        {
+          "path": "src/lib/components/ReadingPane.svelte",
+          "status": "M",
+          "extension": ".svelte"
+        },
+        {
+          "path": "src/lib/components/article/treatments/BriefingTreatment.svelte",
+          "status": "M",
+          "extension": ".svelte"
+        },
+        {
+          "path": "src/lib/components/article/treatments/DiscussionTreatment.svelte",
+          "status": "M",
+          "extension": ".svelte"
+        },
+        {
+          "path": "src/lib/data/curated-feeds.ts",
+          "status": "A",
+          "extension": ".ts"
+        },
+        {
+          "path": "src/lib/server/auth.ts",
+          "status": "M",
+          "extension": ".ts"
+        },
+        {
+          "path": "src/lib/server/email.ts",
+          "status": "M",
+          "extension": ".ts"
+        },
+        {
+          "path": "src/lib/server/ratelimit.ts",
+          "status": "M",
+          "extension": ".ts"
+        },
+        {
+          "path": "src/lib/server/services/audio.ts",
+          "status": "M",
+          "extension": ".ts"
+        },
+        {
+          "path": "src/lib/server/services/briefing.ts",
+          "status": "M",
+          "extension": ".ts"
+        },
+        {
+          "path": "src/lib/server/services/llm.ts",
+          "status": "M",
+          "extension": ".ts"
+        },
+        {
+          "path": "src/lib/server/services/podcast.ts",
+          "status": "M",
+          "extension": ".ts"
+        }
+      ],
+      "type": "feat"
+    },
+    {
+      "name": "main",
+      "shortHash": "39f5b0c",
+      "fullHash": "39f5b0ce9e73445655adfe76cc78dbe45fbf163c",
+      "message": "fix: restore Buy Chai button — it's a tip jar, not a subscription",
+      "timestamp": 1779473210,
+      "relativeTime": "3d ago",
+      "parentBranch": "feat/security-hardening-magazine-ui",
+      "changedFiles": [
+        {
+          "path": "src/hooks.server.ts",
+          "status": "M",
+          "extension": ".ts"
+        },
+        {
+          "path": "src/lib/components/FeedPane.svelte",
+          "status": "M",
+          "extension": ".svelte"
+        },
+        {
+          "path": "src/lib/components/ReadingPane.svelte",
+          "status": "M",
+          "extension": ".svelte"
+        },
+        {
+          "path": "src/lib/components/Sidebar.svelte",
+          "status": "M",
+          "extension": ".svelte"
+        }
+      ],
+      "type": "main"
+    }
+  ],
+  "defaultBranch": "main"
+}
